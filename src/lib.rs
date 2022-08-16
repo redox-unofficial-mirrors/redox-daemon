@@ -5,7 +5,6 @@ use syscall::{
     EIO,
     Error,
     exit,
-    pipe2,
     read,
     Result,
     write,
@@ -16,31 +15,44 @@ pub struct Daemon {
     write_pipe: usize,
 }
 
+fn e(result: libc::c_int) -> Result<usize> {
+    if result == -1 {
+        return Err(Error::new(unsafe { libc::__errno_location().read() }));
+    }
+    Ok(result as usize)
+}
+
 impl Daemon {
     pub fn new<F: FnOnce(Daemon) -> !>(f: F) -> Result<!> {
-        let mut pipes = [0; 2];
-        pipe2(&mut pipes, 0)?;
+        let mut pipes: [libc::c_int; 2] = [0; 2];
 
-        let [read_pipe, write_pipe] = pipes;
+        e(unsafe { libc::pipe(pipes.as_mut_ptr()) })?;
 
-        if unsafe { libc::fork() } == 0 {
-            let _ = close(read_pipe);
+        let [read_pipe, write_pipe] = pipes.map(|c_fd| c_fd as usize);
 
-            f(Daemon {
-                write_pipe,
-            });
-        } else {
-            let _ = close(write_pipe);
+        match e(unsafe { libc::fork() })? {
+            // child
+            0 => {
+                let _ = close(read_pipe);
 
-            let mut data = [0];
-            let res = read(read_pipe, &mut data);
-            let _ = close(read_pipe);
+                f(Daemon {
+                    write_pipe,
+                });
+            }
+            // parent
+            _ => {
+                let _ = close(write_pipe);
 
-            if res? == 1 {
-                exit(data[0] as usize)?;
-                unreachable!();
-            } else {
-                Err(Error::new(EIO))
+                let mut data = [0];
+                let res = read(read_pipe, &mut data);
+                let _ = close(read_pipe);
+
+                if res? == 1 {
+                    exit(data[0] as usize)?;
+                    unreachable!();
+                } else {
+                    Err(Error::new(EIO))
+                }
             }
         }
     }
