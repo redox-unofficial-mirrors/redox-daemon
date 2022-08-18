@@ -10,6 +10,11 @@ repository = "https://gitlab.redox-os.org/redox-os/redox-daemon"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+scheme = ["bytemuck"]
+
 [dependencies]
 libc = "0.2"
-redox_syscall = "0.3"
+#redox_syscall = "0.3"
+redox_syscall = { git = "https://gitlab.redox-os.org/4lDO2/syscall", branch = "better_packet_format" }
+bytemuck = { version = "1", optional = true }

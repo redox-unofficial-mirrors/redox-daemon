@@ -68,3 +68,30 @@ impl Daemon {
         }
     }
 }
+
+#[cfg(feature = "scheme")]
+pub fn get_scheme_auth(auth_socket: usize, id: u64) -> Result<syscall::Auth> {
+    let _ = syscall::write(auth_socket, &u64::to_ne_bytes(id))?;
+    let mut bytes = [0_u8; core::mem::size_of::<syscall::Auth>()];
+    let _ = syscall::read(auth_socket, &mut bytes)?;
+    Ok(*bytemuck::from_bytes(&bytes))
+}
+#[cfg(feature = "scheme")]
+pub fn response_fevent_packet(flags: syscall::EventFlags, id: usize, value: usize) -> [syscall::Cqe; 2] {
+    const EVENT_SHIFT: u32 = usize::BITS - 8;
+    const EVENT_MASK: u64 = (1_u64 << EVENT_SHIFT) - 1;
+
+    [
+        syscall::data::Cqe {
+            user_data: 0,
+            result: (syscall::number::SchemeResponseOp::Fevent as u64) << EVENT_SHIFT | (flags.bits() as u64 & EVENT_MASK),
+        },
+        syscall::data::Cqe {
+            user_data: id as u64,
+            result: value as u64,
+        },
+        // TODO: The kernel used to ignore the `d` field when writing SYS_FEVENT.
+        // If we made response codes 8 bits, the flags could be 56 (or 24) bits
+        // depending on pointer size.
+    ]
+}
