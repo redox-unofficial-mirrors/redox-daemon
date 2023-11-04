@@ -1,11 +1,6 @@
 #![feature(never_type)]
 
-use syscall::{
-    EIO,
-    Error,
-    Result,
-    EINTR,
-};
+use libredox::error::{Error, Result, EINTR, EIO};
 
 #[must_use = "Daemon::ready must be called"]
 pub struct Daemon {
