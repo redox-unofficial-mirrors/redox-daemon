@@ -1,6 +1,6 @@
 #![feature(never_type)]
 
-use libredox::error::{Error, Result, EINTR, EIO};
+use libredox::{error::{Error, Result}, errno::{EINTR, EIO}};
 
 #[must_use = "Daemon::ready must be called"]
 pub struct Daemon {
@@ -17,7 +17,7 @@ impl Daemon {
 
         match unsafe { libc::pipe(pipes.as_mut_ptr()) } {
             0 => (),
-            -1 => return Err(Error { errno: errno() }),
+            -1 => return Err(Error::new(errno())),
             _ => unreachable!(),
         }
 
@@ -29,7 +29,7 @@ impl Daemon {
 
                 f(Daemon { write_pipe })
             }
-            -1 => return Err(Error { errno: errno() }),
+            -1 => return Err(Error::new(errno())),
             _pid => {
                 let _ = unsafe { libc::close(write_pipe) };
 
@@ -38,7 +38,7 @@ impl Daemon {
                 let res = loop {
                     match unsafe { libc::read(read_pipe, data.as_mut_ptr().cast(), data.len()) } {
                         -1 if errno() == EINTR => continue,
-                        -1 => break Err(Error { errno: errno() }),
+                        -1 => break Err(Error::new(errno())),
 
                         count => break Ok(count as usize),
                     }
@@ -63,7 +63,7 @@ impl Daemon {
             res = loop {
                 match libc::write(self.write_pipe, src.as_ptr().cast(), src.len()) {
                     -1 if errno() == EINTR => continue,
-                    -1 => break Err(Error { errno: errno() }),
+                    -1 => break Err(Error::new(errno())),
                     count => break Ok(count),
                 }
             };
